@@ -18,3 +18,4 @@ RUN go build -o main .
 
 # Definir el comando por defecto para ejecutar la aplicación
 CMD ["./main"]
+
