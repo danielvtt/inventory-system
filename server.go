@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"inventory-system/models"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	telebot "gopkg.in/tucnak/telebot.v2"
 )
 
 var medicamentoCollection *mongo.Collection
@@ -62,24 +65,24 @@ func startServer() {
 		c.JSON(http.StatusCreated, newMedicamento)
 	})
 
-	r.GET("/medicamentos/:nombre", func(c *gin.Context) {
-		nombre := c.Param("nombre")
-		var medicamento models.Medicamento
-
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		err := medicamentoCollection.FindOne(ctx, bson.M{"nombre": nombre}).Decode(&medicamento)
+	r.POST("/webhook", func(c *gin.Context) {
+		bot, err := telebot.NewBot(telebot.Settings{
+			Token:  os.Getenv("TELEGRAM_TOKEN"),
+			Poller: &telebot.LongPoller{Timeout: 10 * time.Second},
+		})
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.JSON(http.StatusNotFound, gin.H{"message": "Medicamento no encontrado"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Fatal(err)
+		}
+
+		update := telebot.Update{}
+		if err := c.ShouldBindJSON(&update); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, medicamento)
+		bot.ProcessUpdate(update)
+
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	r.Run(":8080")
